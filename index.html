@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maine Municipalities Filter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .filters {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .filter-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .filter-item select,
+        .filter-item input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .filter-item select:focus,
+        .filter-item input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .category-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .category-btn {
+            padding: 12px 24px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .category-btn:hover {
+            background: #f8f9fa;
+        }
+        
+        .category-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .stats {
+            padding: 20px 30px;
+            background: #e7f3ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stat-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            padding: 30px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #667eea;
+            color: white;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        th:hover {
+            background: #5568d3;
+        }
+        
+        th.sortable::after {
+            content: ' ⇅';
+            opacity: 0.5;
+        }
+        
+        th.sorted-asc::after {
+            content: ' ↑';
+            opacity: 1;
+        }
+        
+        th.sorted-desc::after {
+            content: ' ↓';
+            opacity: 1;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #e9ecef;
+            transition: background 0.2s;
+        }
+        
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        td {
+            padding: 15px;
+            color: #495057;
+        }
+        
+        .type-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .type-city {
+            background: #667eea;
+            color: white;
+        }
+        
+        .type-town {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .type-plantation {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 60px 30px;
+            color: #6c757d;
+        }
+        
+        .no-results h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .filter-group {
+                flex-direction: column;
+            }
+            
+            .stats {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            table {
+                font-size: 14px;
+            }
+            
+            th, td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <h1>🏘️ Maine Municipalities Explorer</h1>
+            <p>Filter and explore cities, towns, and plantations in Maine</p>
+        </div>
+        
+        <div class="filters">
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; color: #495057; margin-bottom: 10px; display: block;">Filter by Category:</label>
+                <div class="category-buttons">
+                    <button class="category-btn" :class="{ active: categoryFilter === 'all' }" @click="setCategoryFilter('all')">
+                        All ({{ municipalities.length }})
+                    </button>
+                    <button class="category-btn" :class="{ active: categoryFilter === 'village' }" @click="setCategoryFilter('village')">
+                        Village/Town (500-10k)
+                    </button>
+                    <button class="category-btn" :class="{ active: categoryFilter === 'tiny' }" @click="setCategoryFilter('tiny')">
+                        Tiny City (10k-25k)
+                    </button>
+                    <button class="category-btn" :class="{ active: categoryFilter === 'small' }" @click="setCategoryFilter('small')">
+                        Small City (25k-100k)
+                    </button>
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <div class="filter-item">
+                    <label>Type:</label>
+                    <select v-model="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="City">City</option>
+                        <option value="Town">Town</option>
+                        <option value="Plantation">Plantation</option>
+                    </select>
+                </div>
+                
+                <div class="filter-item">
+                    <label>County:</label>
+                    <select v-model="countyFilter">
+                        <option value="">All Counties</option>
+                        <option v-for="county in counties" :key="county" :value="county">{{ county }}</option>
+                    </select>
+                </div>
+                
+                <div class="filter-item">
+                    <label>Search by Name:</label>
+                    <input type="text" v-model="searchQuery" placeholder="Enter municipality name...">
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <div class="filter-item">
+                    <label>Min Population:</label>
+                    <input type="number" v-model.number="minPopulation" placeholder="e.g., 10000">
+                </div>
+                
+                <div class="filter-item">
+                    <label>Max Population:</label>
+                    <input type="number" v-model.number="maxPopulation" placeholder="e.g., 25000">
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">Showing:</span>
+                <span class="stat-value">{{ filteredMunicipalities.length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Total Population:</span>
+                <span class="stat-value">{{ totalPopulation.toLocaleString() }}</span>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <div v-if="filteredMunicipalities.length === 0" class="no-results">
+                <h3>No results found</h3>
+                <p>Try adjusting your filters</p>
+            </div>
+            <table v-else>
+                <thead>
+                    <tr>
+                        <th class="sortable" :class="sortClass('Municipality')" @click="sort('Municipality')">Municipality</th>
+                        <th class="sortable" :class="sortClass('Type')" @click="sort('Type')">Type</th>
+                        <th class="sortable" :class="sortClass('County')" @click="sort('County')">County</th>
+                        <th class="sortable" :class="sortClass('Population_2020')" @click="sort('Population_2020')">Population (2020)</th>
+                        <th class="sortable" :class="sortClass('Land_Area_SqMi')" @click="sort('Land_Area_SqMi')">Area (sq mi)</th>
+                        <th class="sortable" :class="sortClass('Year_Incorporated')" @click="sort('Year_Incorporated')">Year Inc.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="muni in filteredMunicipalities" :key="muni.Municipality">
+                        <td><strong>{{ muni.Municipality }}</strong></td>
+                        <td>
+                            <span class="type-badge" :class="'type-' + muni.Type.toLowerCase()">
+                                {{ muni.Type }}
+                            </span>
+                        </td>
+                        <td>{{ muni.County }}</td>
+                        <td><strong>{{ muni.Population_2020.toLocaleString() }}</strong></td>
+                        <td>{{ muni.Land_Area_SqMi }}</td>
+                        <td>{{ muni.Year_Incorporated }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    municipalities: [],
+                    typeFilter: '',
+                    countyFilter: '',
+                    searchQuery: '',
+                    minPopulation: null,
+                    maxPopulation: null,
+                    categoryFilter: 'all',
+                    sortKey: 'Population_2020',
+                    sortOrder: 'desc'
+                };
+            },
+            computed: {
+                counties() {
+                    const counties = [...new Set(this.municipalities.map(m => m.County.replace(' (seat)', '').replace(' (capital)', '')))];
+                    return counties.sort();
+                },
+                filteredMunicipalities() {
+                    let filtered = this.municipalities;
+
+                    // Category filter
+                    if (this.categoryFilter === 'village') {
+                        filtered = filtered.filter(m => m.Population_2020 >= 500 && m.Population_2020 < 10000);
+                    } else if (this.categoryFilter === 'tiny') {
+                        filtered = filtered.filter(m => m.Population_2020 >= 10000 && m.Population_2020 < 25000);
+                    } else if (this.categoryFilter === 'small') {
+                        filtered = filtered.filter(m => m.Population_2020 >= 25000 && m.Population_2020 < 100000);
+                    }
+
+                    // Type filter
+                    if (this.typeFilter) {
+                        filtered = filtered.filter(m => m.Type === this.typeFilter);
+                    }
+
+                    // County filter
+                    if (this.countyFilter) {
+                        filtered = filtered.filter(m => m.County.includes(this.countyFilter));
+                    }
+
+                    // Search filter
+                    if (this.searchQuery) {
+                        const query = this.searchQuery.toLowerCase();
+                        filtered = filtered.filter(m => m.Municipality.toLowerCase().includes(query));
+                    }
+
+                    // Population range
+                    if (this.minPopulation !== null && this.minPopulation !== '') {
+                        filtered = filtered.filter(m => m.Population_2020 >= this.minPopulation);
+                    }
+                    if (this.maxPopulation !== null && this.maxPopulation !== '') {
+                        filtered = filtered.filter(m => m.Population_2020 <= this.maxPopulation);
+                    }
+
+                    // Sort
+                    return filtered.sort((a, b) => {
+                        let aVal = a[this.sortKey];
+                        let bVal = b[this.sortKey];
+                        
+                        if (typeof aVal === 'string') {
+                            aVal = aVal.toLowerCase();
+                            bVal = bVal.toLowerCase();
+                        }
+                        
+                        if (aVal < bVal) return this.sortOrder === 'asc' ? -1 : 1;
+                        if (aVal > bVal) return this.sortOrder === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                },
+                totalPopulation() {
+                    return this.filteredMunicipalities.reduce((sum, m) => sum + m.Population_2020, 0);
+                }
+            },
+            methods: {
+                setCategoryFilter(category) {
+                    this.categoryFilter = category;
+                    
+                    // Auto-set population range based on category
+                    if (category === 'village') {
+                        this.minPopulation = 500;
+                        this.maxPopulation = 10000;
+                    } else if (category === 'tiny') {
+                        this.minPopulation = 10000;
+                        this.maxPopulation = 25000;
+                    } else if (category === 'small') {
+                        this.minPopulation = 25000;
+                        this.maxPopulation = 100000;
+                    } else {
+                        this.minPopulation = null;
+                        this.maxPopulation = null;
+                    }
+                },
+                sort(key) {
+                    if (this.sortKey === key) {
+                        this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.sortKey = key;
+                        this.sortOrder = 'asc';
+                    }
+                },
+                sortClass(key) {
+                    if (this.sortKey === key) {
+                        return this.sortOrder === 'asc' ? 'sorted-asc' : 'sorted-desc';
+                    }
+                    return '';
+                },
+                loadData() {
+                    // CSV data embedded directly
+                    const csvData = `Municipality,Type,County,Population_2020,Land_Area_SqMi,Land_Area_Km2,Year_Incorporated
+Portland,City,Cumberland (seat),68408,21.6,56,1786
+Lewiston,City,Androscoggin,37121,34.2,89,1795
+Bangor,City,Penobscot (seat),31753,34.3,89,1834
+South Portland,City,Cumberland,26498,12.1,31,1895
+Auburn,City,Androscoggin (seat),24061,59.3,154,1842
+Biddeford,City,York,22552,30.1,78,1653
+Scarborough,Town,Cumberland,22135,47.6,123,1658
+Sanford,City,York,21982,47.8,124,1768
+Brunswick,Town,Cumberland,21756,46.7,121,1739
+Westbrook,City,Cumberland,20400,17.2,45,1814
+Saco,City,York,20381,38.6,100,1775
+Augusta,City (capital),Kennebec (seat),18899,55.2,143,1797
+Windham,Town,Cumberland,18434,46.6,121,1762
+Gorham,Town,Cumberland,18336,50.6,131,1764
+Waterville,City,Kennebec,15828,13.5,35,1802
+York,Town,York,13723,54.7,142,1652
+Falmouth,Town,Cumberland,12444,29.4,76,1718
+Kennebunk,Town,York,11536,35.1,91,1820
+Wells,Town,York,11314,57.6,149,1653
+Orono,Town,Penobscot,11183,18.2,47,1806
+Standish,Town,Cumberland,10244,59.0,153,1785
+Kittery,Town,York,10070,17.8,46,1647`;
+
+                    Papa.parse(csvData, {
+                        header: true,
+                        dynamicTyping: true,
+                        complete: (results) => {
+                            this.municipalities = results.data.filter(row => row.Municipality);
+                        }
+                    });
+                }
+            },
+            mounted() {
+                this.loadData();
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
